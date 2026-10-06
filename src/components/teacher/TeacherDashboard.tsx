@@ -21,6 +21,7 @@ import {
   ArrowRight,
   CheckCircle2,
   ChevronRight,
+  Database,
 } from 'lucide-react';
 import {
   BarChart,
@@ -44,16 +45,13 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onNavi
   const questions = storageService.getQuestions();
   const rfMetrics = randomForestService.getMetrics();
 
-  // Classroom analytics
   const heatmap = MasteryService.getClassroomMasteryHeatmap();
   const atRiskStudents = heatmap.students.filter(
     s => s.risk === 'Intervention Recommended' || s.risk === 'Needs Attention'
   );
 
-  // Weakest concepts across classroom
   const weakestTopics = [...heatmap.topics].sort((a, b) => a.classAvg - b.classAvg);
 
-  // Score distribution for chart
   const avgClassMastery = heatmap.topics.length > 0
     ? Math.round((heatmap.topics.reduce((acc, t) => acc + t.classAvg, 0) / heatmap.topics.length) * 100)
     : 68;
@@ -66,6 +64,11 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onNavi
   const handleExportCSV = () => {
     const csv = ReportService.generateClassPerformanceCSV();
     ReportService.downloadCSV('IntelliExam_Classroom_Performance_Report.csv', csv);
+  };
+
+  const handleTestSupabase = async () => {
+    const result = await storageService.testSupabaseConnection();
+    alert(result);
   };
 
   return (
@@ -97,6 +100,16 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onNavi
               <Sparkles className="h-4 w-4" />
               <span>AI Exam Generator</span>
             </button>
+
+            {/* Temporary Supabase Test Button */}
+            <button
+              onClick={handleTestSupabase}
+              className="flex items-center gap-2 rounded-xl border border-emerald-600 bg-emerald-600/20 px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-emerald-300 hover:bg-emerald-600/30 transition"
+            >
+              <Database className="h-4 w-4" />
+              <span>Test Supabase</span>
+            </button>
+
             <button
               onClick={handleExportCSV}
               className="flex items-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-slate-200 hover:bg-slate-700 hover:text-white transition"
@@ -171,9 +184,8 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onNavi
         </div>
       </div>
 
-      {/* Main Grid: Class Performance Chart & Early Intervention Table */}
+      {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left 2 Cols: Classroom Topic Mastery Chart */}
         <div className="lg:col-span-2 space-y-6">
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 shadow-xl space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
@@ -211,7 +223,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onNavi
             </div>
           </div>
 
-          {/* Early Intervention Alerts Table */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-4">
             <div className="flex items-center justify-between pb-3 border-b border-slate-800">
               <div className="flex items-center gap-2">
@@ -274,9 +285,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onNavi
           </div>
         </div>
 
-        {/* Right Col: Top Class Weaknesses & Quick Actions */}
         <div className="space-y-6">
-          {/* Top Weak Concepts */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 space-y-4">
             <h3 className="text-sm font-bold text-white">Classroom Deficit Concepts</h3>
             <p className="text-xs text-slate-400">Topics where the cohort has the lowest combined accuracy.</p>
@@ -301,7 +310,6 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onNavi
             </div>
           </div>
 
-          {/* Quick Management Links */}
           <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5 space-y-3">
             <h3 className="text-sm font-bold text-white">Quick Instructor Actions</h3>
             <div className="space-y-2">

@@ -1,8 +1,5 @@
 /**
  * Persistent Storage & Database Layer
- * 
- * Manages normalized entities, localStorage persistence, dataset import/export,
- * and initializes seed records with Random Forest model training.
  */
 
 import {
@@ -42,8 +39,8 @@ export interface AppState {
   achievements: Achievement[];
   exams: Exam[];
   examAttempts: ExamAttempt[];
-  masteryRecords: Record<string, Record<string, ConceptMastery>>; // [studentId][conceptId] => ConceptMastery
-  rewardProfiles: Record<string, StudentRewardProfile>; // [studentId] => StudentRewardProfile
+  masteryRecords: Record<string, Record<string, ConceptMastery>>;
+  rewardProfiles: Record<string, StudentRewardProfile>;
   auditLogs: AuditLog[];
   lastModelTrainingTime?: string;
 }
@@ -98,20 +95,33 @@ class StorageService {
     };
   }
 
-  private async loadFromSupabase(): Promise<void> {
+  public async testSupabaseConnection(): Promise<string> {
     try {
-      const { data: qData } = await supabase.from('questions').select('*');
-      if (qData && qData.length > 0) {
-        console.log("Successfully connected to Supabase and fetched data.");
+      const url = import.meta.env.VITE_SUPABASE_URL;
+      const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+      if (!url || !key) {
+        return "❌ ERROR: Missing env vars. VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is undefined. Did you add them to Vercel and redeploy?";
       }
-    } catch (e) {
-      console.error("Supabase connection error:", e);
+
+      const { data, error } = await supabase.from('subjects').select('*');
+
+      if (error) {
+        return `❌ SUPABASE ERROR: ${error.message} (Code: ${error.code})`;
+      }
+
+      if (data) {
+        return `✅ SUCCESS: Connected to Supabase! Found ${data.length} subjects in the database.`;
+      }
+
+      return "⚠️ Connected, but the 'subjects' table is empty.";
+    } catch (e: any) {
+      return `❌ EXCEPTION: ${e.message || 'Unknown error'}`;
     }
   }
 
   private ensureInitialized(): void {
-    this.loadFromSupabase(); // Fire and forget async load
-    // 1. Ensure user roster synchronization (Ms Annapurna as teacher)
+    // 1. Ensure user roster synchronization
     if (this.state.users) {
       this.state.users = this.state.users.map(u => {
         if (u.role === 'teacher' || u.id === 'usr_teacher_1') {
@@ -125,25 +135,23 @@ class StorageService {
         }
         return u;
       });
-      // Ensure seed users exist if empty
       if (this.state.users.length === 0) {
         this.state.users = [...SEED_USERS];
       }
     }
 
-    // 2. Train Random Forest model on seed grading records
+    // 2. Train Random Forest model
     if (this.state.teacherGradingRecords.length >= 5) {
       randomForestService.train(this.state.teacherGradingRecords);
       this.state.lastModelTrainingTime = new Date().toISOString();
     }
 
-    // 2. Initialize student mastery maps with realistic baseline data if empty
+    // 3. Initialize student mastery maps
     if (Object.keys(this.state.masteryRecords).length === 0) {
       const studentProfiles = [
         { id: '24BDS0162', credits: 480, streak: 5, qBase: 0.85, bstBase: 0.72, graphBase: 0.78, dpBase: 0.65, laBase: 0.88, calcBase: 0.80 },
         { id: '24BCE2930', credits: 340, streak: 3, qBase: 0.60, bstBase: 0.45, graphBase: 0.38, dpBase: 0.70, laBase: 0.65, calcBase: 0.55 },
         { id: '24BCI0287', credits: 290, streak: 4, qBase: 0.75, bstBase: 0.80, graphBase: 0.62, dpBase: 0.40, laBase: 0.58, calcBase: 0.72 },
-        // Fallback backward compatibility IDs
         { id: '101', credits: 480, streak: 5, qBase: 0.85, bstBase: 0.72, graphBase: 0.78, dpBase: 0.65, laBase: 0.88, calcBase: 0.80 },
         { id: '102', credits: 290, streak: 4, qBase: 0.75, bstBase: 0.80, graphBase: 0.62, dpBase: 0.40, laBase: 0.58, calcBase: 0.72 },
         { id: '103', credits: 340, streak: 3, qBase: 0.60, bstBase: 0.45, graphBase: 0.38, dpBase: 0.70, laBase: 0.65, calcBase: 0.55 },
@@ -163,7 +171,6 @@ class StorageService {
           redeemedCoupons: [],
         };
 
-        // Seed diverse initial mastery probabilities
         const concepts = [
           { id: 'C1_Quadratic_Equations', name: 'Quadratic Equations', subject: 'Mathematics', base: sp.qBase },
           { id: 'C4_Binary_Search_Trees', name: 'Binary Search Trees', subject: 'Computer Science', base: sp.bstBase },
@@ -216,42 +223,17 @@ class StorageService {
     this.listeners.forEach(cb => cb());
   }
 
-  // Getters
-  getState(): AppState {
-    return this.state;
-  }
-
-  getUsers(): User[] {
-    return this.state.users;
-  }
-
-  getQuestions(): Question[] {
-    return this.state.questions;
-  }
-
-  getResources(): LearningResource[] {
-    return this.state.resources;
-  }
-
-  getTeacherGradingRecords(): TeacherGradingRecord[] {
-    return this.state.teacherGradingRecords;
-  }
-
-  getExams(): Exam[] {
-    return this.state.exams;
-  }
-
-  getExamAttempts(): ExamAttempt[] {
-    return this.state.examAttempts;
-  }
-
-  getMasteryRecords(studentId: string): Record<string, ConceptMastery> {
-    return this.state.masteryRecords[studentId] || {};
-  }
-
-  getAllMasteryRecords(): Record<string, Record<string, ConceptMastery>> {
-    return this.state.masteryRecords;
-  }
+  getState(): AppState { return this.state; }
+  getUsers(): User[] { return this.state.users; }
+  getQuestions(): Question[] { return this.state.questions; }
+  getResources(): LearningResource[] { return this.state.resources; }
+  getTeacherGradingRecords(): TeacherGradingRecord[] { return this.state.teacherGradingRecords; }
+  getExams(): Exam[] { return this.state.exams; }
+  getExamAttempts(): ExamAttempt[] { return this.state.examAttempts; }
+  getMasteryRecords(studentId: string): Record<string, ConceptMastery> { return this.state.masteryRecords[studentId] || {}; }
+  getAllMasteryRecords(): Record<string, Record<string, ConceptMastery>> { return this.state.masteryRecords; }
+  getCoupons(): RewardCoupon[] { return this.state.coupons; }
+  getAuditLogs(): AuditLog[] { return this.state.auditLogs; }
 
   getRewardProfile(studentId: string): StudentRewardProfile {
     if (!this.state.rewardProfiles[studentId]) {
@@ -270,15 +252,6 @@ class StorageService {
     return this.state.rewardProfiles[studentId];
   }
 
-  getCoupons(): RewardCoupon[] {
-    return this.state.coupons;
-  }
-
-  getAuditLogs(): AuditLog[] {
-    return this.state.auditLogs;
-  }
-
-  // Mutations
   addAuditLog(userId: string, userRole: User['role'], action: string, details: string, entityId?: string): void {
     const log: AuditLog = {
       id: `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
@@ -331,7 +304,6 @@ class StorageService {
     this.state.examAttempts.unshift(attempt);
     this.saveState();
 
-    // Push exam attempt to Supabase
     try {
       supabase.from('exams').insert([{
         status: attempt.status === 'graded' ? 'graded' : 'completed'
@@ -360,13 +332,12 @@ class StorageService {
     this.state.lastModelTrainingTime = new Date().toISOString();
     this.saveState();
 
-    // Push to Supabase to fulfill "Backend Database" requirement
     records.forEach(async (r) => {
       try {
         await supabase.from('student_answers').insert([{
           student_text: `Graded Record Data (Correctness: ${r.correctness})`,
           teacher_final_score: r.teacherGrade,
-          ai_suggested_score: r.teacherGrade 
+          ai_suggested_score: r.teacherGrade
         }]);
       } catch (err) {
         console.error("Failed to backup to Supabase", err);
