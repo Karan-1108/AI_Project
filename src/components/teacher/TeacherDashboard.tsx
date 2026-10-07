@@ -43,7 +43,7 @@ export const TeacherDashboard: React.FC<TeacherDashboardProps> = ({ user, onNavi
   const exams = storageService.getExams();
   const attempts = storageService.getExamAttempts();
   const questions = storageService.getQuestions();
-  const rfMetrics = randomForestService.getMetrics();
+  const rfMetrics = randomForestService.getMetrics() ?? { r2Score: 0, featureImportances: {} };
 
   const heatmap = MasteryService.getClassroomMasteryHeatmap();
   const atRiskStudents = heatmap.students.filter(
