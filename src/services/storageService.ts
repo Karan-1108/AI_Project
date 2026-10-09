@@ -46,6 +46,7 @@ export interface AppState {
 }
 
 const STORAGE_KEY = 'ai_intelligent_exam_system_v2_state';
+const SEED_VERSION = 'v3_30concepts_60questions'; // bump whenever seedData.ts changes
 
 class StorageService {
   private state: AppState;
@@ -56,14 +57,31 @@ class StorageService {
     this.ensureInitialized();
   }
 
-  private loadState(): AppState {
+    private loadState(): AppState {
     try {
+      const storedVersion = localStorage.getItem(`${STORAGE_KEY}_version`);
+
+      // If the seed version changed, wipe stale state and start fresh
+      if (storedVersion !== SEED_VERSION) {
+        console.log(`🔄 Seed version changed (${storedVersion || 'none'} → ${SEED_VERSION}). Resetting local state.`);
+        localStorage.removeItem(STORAGE_KEY);
+        localStorage.setItem(`${STORAGE_KEY}_version`, SEED_VERSION);
+        return this.getInitialState();
+      }
+
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         return JSON.parse(raw);
       }
     } catch (e) {
       console.warn('Could not read localStorage:', e);
+    }
+
+    // First-time load — stamp the version
+    try {
+      localStorage.setItem(`${STORAGE_KEY}_version`, SEED_VERSION);
+    } catch (e) {
+      // ignore
     }
 
     return this.getInitialState();
