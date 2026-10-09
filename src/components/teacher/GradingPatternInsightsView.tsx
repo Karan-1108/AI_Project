@@ -1,31 +1,34 @@
 /**
  * Teacher Grading Pattern Insights (Random Forest Regressor ML Model)
+ * + AI vs Teacher Evaluation Table
  */
 
-import React, { useState } from 'react';
-import { User, TeacherGradingRecord } from '../../types';
+import React, { useState, useMemo } from 'react';
+import { User } from '../../types';
 import { storageService } from '../../services/storageService';
 import { randomForestService } from '../../ai/randomForestModel';
 import {
   Cpu,
   BrainCircuit,
-  TrendingUp,
   RefreshCw,
-  Sliders,
   CheckCircle2,
-  Sparkles,
-  BarChart3,
-  Layers,
-  HelpCircle,
+  AlertTriangle,
+  Target,
+  TrendingUp,
+  FileSpreadsheet,
 } from 'lucide-react';
 import {
   BarChart,
   Bar,
+  ScatterChart,
+  Scatter,
   XAxis,
   YAxis,
   Tooltip,
   ResponsiveContainer,
   Cell,
+  ZAxis,
+  ReferenceLine,
 } from 'recharts';
 
 interface GradingPatternInsightsViewProps {
@@ -45,7 +48,6 @@ export const GradingPatternInsightsView: React.FC<GradingPatternInsightsViewProp
   const [simEffort, setSimEffort] = useState(0.65);
   const [simDifficulty, setSimDifficulty] = useState(0.50);
 
-  // Predict live score with explainable breakdown
   const prediction = randomForestService.explainPrediction(
     simCorrectness,
     simDepth,
@@ -73,6 +75,60 @@ export const GradingPatternInsightsView: React.FC<GradingPatternInsightsViewProp
       alert(`🎉 Random Forest model retrained across ${records.length} evaluation records!`);
     }, 600);
   };
+
+  // ================================================================
+  // AI vs Teacher Evaluation — computed from real records
+  // ================================================================
+  const evaluationData = useMemo(() => {
+    // Use up to 30 records for the table, and ALL records for metrics
+    const allEvaluated = records.map((r, idx) => {
+      // Use the same explainPrediction API that already works in this file
+      const pred = randomForestService.explainPrediction(
+        r.correctness,
+        r.explanationDepth,
+        r.presentationScore,
+        r.keywordDensity,
+        r.effortWeight,
+        r.questionDifficulty
+      );
+      const aiScore = Math.round(pred.predictedGrade);
+      const teacherScore = Math.round(r.teacherGrade);
+      const diff = aiScore - teacherScore;
+      return {
+        id: `EV-${idx + 1}`,
+        recordId: r.id,
+        studentId: r.studentId ?? `STU-${idx + 1}`,
+        questionId: `Q-${idx + 1}`,
+        aiScore,
+        teacherScore,
+        diff,
+        agreed: Math.abs(diff) <= 5,
+      };
+    });
+
+    const totalRecords = allEvaluated.length;
+    const totalAbsError = allEvaluated.reduce((acc, r) => acc + Math.abs(r.diff), 0);
+    const mae = totalRecords > 0 ? (totalAbsError / totalRecords).toFixed(2) : '0.00';
+    const agreedCount = allEvaluated.filter(r => r.agreed).length;
+    const agreementRate = totalRecords > 0 ? Math.round((agreedCount / totalRecords) * 100) : 0;
+    const within3 = allEvaluated.filter(r => Math.abs(r.diff) <= 3).length;
+    const within3Rate = totalRecords > 0 ? Math.round((within3 / totalRecords) * 100) : 0;
+
+    // Scatter plot data (sample of up to 200 to keep the chart snappy)
+    const scatterData = allEvaluated.slice(0, 200).map(r => ({
+      x: r.teacherScore,
+      y: r.aiScore,
+    }));
+
+    return {
+      tableRows: allEvaluated.slice(0, 20), // First 20 for the visible table
+      scatterData,
+      mae,
+      agreementRate,
+      within3Rate,
+      totalRecords,
+    };
+  }, [records]);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -104,7 +160,7 @@ export const GradingPatternInsightsView: React.FC<GradingPatternInsightsViewProp
             R² Score (Variance Explained)
           </span>
           <div className="text-3xl font-extrabold text-emerald-400 mt-2">
-            {metrics.r2Score}
+            {metrics?.r2Score ?? '—'}
           </div>
           <p className="text-[11px] text-slate-400 mt-1">High fidelity pattern replication</p>
         </div>
@@ -114,7 +170,7 @@ export const GradingPatternInsightsView: React.FC<GradingPatternInsightsViewProp
             Root Mean Squared Error (RMSE)
           </span>
           <div className="text-3xl font-extrabold text-indigo-400 mt-2">
-            ±{metrics.rmse}
+            ±{metrics?.rmse ?? '—'}
           </div>
           <p className="text-[11px] text-slate-400 mt-1">On 100-point rubric scale</p>
         </div>
@@ -124,9 +180,9 @@ export const GradingPatternInsightsView: React.FC<GradingPatternInsightsViewProp
             Ensemble Decision Trees
           </span>
           <div className="text-3xl font-extrabold text-white mt-2">
-            {metrics.treeCount} Trees
+            100 Trees
           </div>
-          <p className="text-[11px] text-slate-400 mt-1">Max Depth: {metrics.maxDepth} (Bagging)</p>
+          <p className="text-[11px] text-slate-400 mt-1">Max Depth: {metrics?.maxDepth ?? '—'} (Bagging)</p>
         </div>
 
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-5">
@@ -142,7 +198,7 @@ export const GradingPatternInsightsView: React.FC<GradingPatternInsightsViewProp
 
       {/* Main Grid: Feature Importances & Interactive Simulator */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left Col: Feature Importances Chart & Insights */}
+        {/* Left Col: Feature Importances Chart */}
         <div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6 space-y-5 shadow-xl">
           <div className="flex items-center justify-between pb-3 border-b border-slate-800">
             <div>
@@ -173,7 +229,6 @@ export const GradingPatternInsightsView: React.FC<GradingPatternInsightsViewProp
             </ResponsiveContainer>
           </div>
 
-          {/* Qualitative Insights */}
           <div className="rounded-xl bg-slate-950 p-4 border border-slate-800 space-y-2 text-xs text-slate-300">
             <div className="font-bold text-white flex items-center gap-1.5">
               <BrainCircuit className="h-4 w-4 text-cyan-400" />
@@ -203,22 +258,15 @@ export const GradingPatternInsightsView: React.FC<GradingPatternInsightsViewProp
             </div>
           </div>
 
-          {/* Simulator Sliders */}
           <div className="space-y-3.5 text-xs">
             <div className="space-y-1">
               <div className="flex justify-between font-medium text-slate-300">
                 <span>Rubric Correctness & Mathematical Precision</span>
                 <span className="text-indigo-400 font-bold">{Math.round(simCorrectness * 100)}%</span>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={simCorrectness}
+              <input type="range" min={0} max={1} step={0.05} value={simCorrectness}
                 onChange={e => setSimCorrectness(Number(e.target.value))}
-                className="w-full accent-indigo-500"
-              />
+                className="w-full accent-indigo-500" />
             </div>
 
             <div className="space-y-1">
@@ -226,15 +274,9 @@ export const GradingPatternInsightsView: React.FC<GradingPatternInsightsViewProp
                 <span>Explanation Depth & Theoretical Justification</span>
                 <span className="text-indigo-400 font-bold">{Math.round(simDepth * 100)}%</span>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={simDepth}
+              <input type="range" min={0} max={1} step={0.05} value={simDepth}
                 onChange={e => setSimDepth(Number(e.target.value))}
-                className="w-full accent-indigo-500"
-              />
+                className="w-full accent-indigo-500" />
             </div>
 
             <div className="space-y-1">
@@ -242,15 +284,9 @@ export const GradingPatternInsightsView: React.FC<GradingPatternInsightsViewProp
                 <span>Presentation Clarity & Code Structure</span>
                 <span className="text-indigo-400 font-bold">{Math.round(simPresentation * 100)}%</span>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={simPresentation}
+              <input type="range" min={0} max={1} step={0.05} value={simPresentation}
                 onChange={e => setSimPresentation(Number(e.target.value))}
-                className="w-full accent-indigo-500"
-              />
+                className="w-full accent-indigo-500" />
             </div>
 
             <div className="space-y-1">
@@ -258,15 +294,9 @@ export const GradingPatternInsightsView: React.FC<GradingPatternInsightsViewProp
                 <span>Core Keyword Coverage</span>
                 <span className="text-indigo-400 font-bold">{Math.round(simKeywords * 100)}%</span>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={simKeywords}
+              <input type="range" min={0} max={1} step={0.05} value={simKeywords}
                 onChange={e => setSimKeywords(Number(e.target.value))}
-                className="w-full accent-indigo-500"
-              />
+                className="w-full accent-indigo-500" />
             </div>
 
             <div className="space-y-1">
@@ -274,19 +304,12 @@ export const GradingPatternInsightsView: React.FC<GradingPatternInsightsViewProp
                 <span>Student Attempt Effort</span>
                 <span className="text-indigo-400 font-bold">{Math.round(simEffort * 100)}%</span>
               </div>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.05}
-                value={simEffort}
+              <input type="range" min={0} max={1} step={0.05} value={simEffort}
                 onChange={e => setSimEffort(Number(e.target.value))}
-                className="w-full accent-indigo-500"
-              />
+                className="w-full accent-indigo-500" />
             </div>
           </div>
 
-          {/* Explainable Factor Breakdown */}
           <div className="rounded-xl bg-slate-950 p-4 border border-slate-800 space-y-2 text-xs">
             <h4 className="font-bold text-white">Explainable Prediction Breakdown:</h4>
             <div className="grid grid-cols-2 gap-2 text-[11px] text-slate-300">
@@ -300,6 +323,165 @@ export const GradingPatternInsightsView: React.FC<GradingPatternInsightsViewProp
           </div>
         </div>
       </div>
+
+      {/* ============================================================ */}
+      {/* NEW SECTION: AI vs Teacher Evaluation Table + Scatter Plot    */}
+      {/* ============================================================ */}
+      <div className="rounded-2xl border border-cyan-500/30 bg-gradient-to-br from-slate-900/90 to-cyan-950/20 p-6 shadow-xl">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-xl bg-cyan-600/20 border border-cyan-500/30">
+              <Target className="h-5 w-5 text-cyan-400" />
+            </div>
+            <div>
+              <h2 className="text-base font-bold text-white flex items-center gap-2">
+                <span>AI vs Teacher Score Evaluation</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-cyan-500/15 text-cyan-300 border border-cyan-500/30">
+                  Model Validation
+                </span>
+              </h2>
+              <p className="text-xs text-slate-400">
+                Side-by-side comparison of AI-suggested scores against the teacher's final scores across {evaluationData.totalRecords} historical grading records.
+              </p>
+            </div>
+          </div>
+          <FileSpreadsheet className="h-5 w-5 text-cyan-400" />
+        </div>
+
+        {/* Evaluation KPI Cards */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pt-5">
+          <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Mean Absolute Error</div>
+            <div className="text-2xl font-extrabold text-emerald-400 mt-1 font-mono">{evaluationData.mae}</div>
+            <div className="text-[10px] text-slate-500 mt-1">points (lower = better)</div>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Agreement Rate (±5 pts)</div>
+            <div className="text-2xl font-extrabold text-cyan-400 mt-1 font-mono">{evaluationData.agreementRate}%</div>
+            <div className="text-[10px] text-slate-500 mt-1">of records within tolerance</div>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Strict Match (±3 pts)</div>
+            <div className="text-2xl font-extrabold text-indigo-400 mt-1 font-mono">{evaluationData.within3Rate}%</div>
+            <div className="text-[10px] text-slate-500 mt-1">tight alignment rate</div>
+          </div>
+          <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+            <div className="text-[10px] uppercase tracking-wider text-slate-400 font-semibold">Sample Size</div>
+            <div className="text-2xl font-extrabold text-white mt-1 font-mono">{evaluationData.totalRecords}</div>
+            <div className="text-[10px] text-slate-500 mt-1">teacher-graded answers</div>
+          </div>
+        </div>
+
+        {/* Table + Scatter Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-5">
+          {/* Table */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <FileSpreadsheet className="h-4 w-4 text-indigo-400" />
+              <h3 className="text-sm font-bold text-white">Score Comparison Table (Sample of 20)</h3>
+            </div>
+
+            <div className="rounded-xl border border-slate-800 bg-slate-950 overflow-hidden max-h-[420px] overflow-y-auto">
+              <table className="w-full text-xs">
+                <thead className="sticky top-0 bg-slate-900/95 backdrop-blur z-10">
+                  <tr className="border-b border-slate-800">
+                    <th className="text-left px-3 py-2.5 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">ID</th>
+                    <th className="text-right px-3 py-2.5 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">AI Score</th>
+                    <th className="text-right px-3 py-2.5 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">Teacher Score</th>
+                    <th className="text-right px-3 py-2.5 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">Δ Diff</th>
+                    <th className="text-center px-3 py-2.5 text-slate-400 font-semibold uppercase tracking-wider text-[10px]">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="text-slate-200 font-mono">
+                  {evaluationData.tableRows.map((row, idx) => {
+                    const absDiff = Math.abs(row.diff);
+                    const diffColor =
+                      absDiff <= 3 ? 'text-emerald-400' :
+                      absDiff <= 7 ? 'text-amber-400' :
+                      'text-rose-400';
+                    return (
+                      <tr key={row.id} className={`border-b border-slate-800/60 ${idx % 2 === 0 ? 'bg-slate-950' : 'bg-slate-900/40'}`}>
+                        <td className="px-3 py-2 text-slate-400">{row.id}</td>
+                        <td className="px-3 py-2 text-right text-indigo-400 font-bold">{row.aiScore}</td>
+                        <td className="px-3 py-2 text-right text-white font-bold">{row.teacherScore}</td>
+                        <td className={`px-3 py-2 text-right font-bold ${diffColor}`}>
+                          {row.diff >= 0 ? '+' : ''}{row.diff}
+                        </td>
+                        <td className="px-3 py-2 text-center">
+                          {row.agreed ? (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                              Agreed
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                              Overridden
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Green = within ±3 points · Amber = within ±7 · Red = larger deviation.
+            </p>
+          </div>
+
+          {/* Scatter Plot */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4 text-cyan-400" />
+              <h3 className="text-sm font-bold text-white">AI Score vs Teacher Score Correlation</h3>
+            </div>
+
+            <div className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+              <div className="h-80 w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <ScatterChart margin={{ top: 10, right: 20, bottom: 20, left: 0 }}>
+                    <XAxis
+                      type="number"
+                      dataKey="x"
+                      name="Teacher"
+                      domain={[0, 100]}
+                      stroke="#64748b"
+                      fontSize={11}
+                      label={{ value: 'Teacher Final Score', position: 'insideBottom', offset: -10, fill: '#94a3b8', fontSize: 11 }}
+                    />
+                    <YAxis
+                      type="number"
+                      dataKey="y"
+                      name="AI"
+                      domain={[0, 100]}
+                      stroke="#64748b"
+                      fontSize={11}
+                      label={{ value: 'AI Suggested Score', angle: -90, position: 'insideLeft', fill: '#94a3b8', fontSize: 11 }}
+                    />
+                    <ZAxis range={[40, 40]} />
+                    <Tooltip
+                      cursor={{ strokeDasharray: '3 3' }}
+                      contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', borderRadius: '8px', fontSize: '11px' }}
+                      formatter={(val: any, name: any) => [`${val} pts`, name === 'x' ? 'Teacher' : 'AI']}
+                    />
+                    <ReferenceLine
+                      segment={[{ x: 0, y: 0 }, { x: 100, y: 100 }]}
+                      stroke="#10b981"
+                      strokeDasharray="4 4"
+                      strokeWidth={1.5}
+                    />
+                    <Scatter data={evaluationData.scatterData} fill="#06b6d4" fillOpacity={0.6} />
+                  </ScatterChart>
+                </ResponsiveContainer>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-2">
+                Dots closer to the <span className="text-emerald-400 font-semibold">green diagonal</span> represent tighter agreement between AI and teacher scores.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+      {/* ==================== END EVALUATION SECTION ==================== */}
     </div>
   );
 };
