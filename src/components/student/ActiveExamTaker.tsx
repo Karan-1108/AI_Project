@@ -23,14 +23,14 @@ import {
 interface ActiveExamTakerProps {
   user: User;
   examId: string;
-  onFinishExam: (attempt: ExamAttempt) => void;
+  onComplete: (attemptId: string) => void;
   onCancel: () => void;
 }
 
 export const ActiveExamTaker: React.FC<ActiveExamTakerProps> = ({
   user,
   examId,
-  onFinishExam,
+  onComplete,
   onCancel,
 }) => {
   const exam = storageService.getExams().find(e => e.id === examId);
@@ -95,8 +95,8 @@ export const ActiveExamTaker: React.FC<ActiveExamTakerProps> = ({
     );
     // Clear draft
     localStorage.removeItem(`exam_draft_${examId}_${user.studentId || user.id}`);
-    onFinishExam(attempt);
-  }, [answers, examId, onFinishExam, startTime, user.displayName, user.id, user.studentId]);
+    onComplete(attempt.id);
+  }, [answers, examId, onComplete, startTime, user.displayName, user.id, user.studentId]);
 
   const handleManualSubmit = () => {
     setIsSubmitting(true);
@@ -110,7 +110,7 @@ export const ActiveExamTaker: React.FC<ActiveExamTakerProps> = ({
     );
     localStorage.removeItem(`exam_draft_${examId}_${user.studentId || user.id}`);
     setIsSubmitting(false);
-    onFinishExam(attempt);
+    onComplete(attempt.id);
   };
 
   if (!exam || questions.length === 0) {

@@ -6,7 +6,6 @@
 import React, { useState, useEffect } from 'react';
 import { User } from './types';
 import { AuthService } from './services/authService';
-import { storageService } from './services/storageService';
 
 // Common Components
 import { Navbar } from './components/common/Navbar';
@@ -117,7 +116,7 @@ export default function App() {
     return <AuthView onLoginSuccess={handleLoginSuccess} />;
   }
 
-  // Active fullscreen exam view (without distracting navigation chrome)
+  // Active fullscreen exam view
   if (activeView === 'active_exam' && activeExamId) {
     return (
       <ActiveExamTaker
@@ -160,6 +159,7 @@ export default function App() {
                   user={currentUser}
                   onNavigate={handleNavigate}
                   onStartExam={handleStartExam}
+                  onViewResult={handleViewResult}
                 />
               )}
 
@@ -168,6 +168,7 @@ export default function App() {
                   user={currentUser}
                   onStartExam={handleStartExam}
                   onViewResult={handleViewResult}
+                  onNavigate={handleNavigate}
                 />
               )}
 
@@ -197,7 +198,6 @@ export default function App() {
                 <WeakTopicsRemediation
                   user={currentUser}
                   onNavigate={handleNavigate}
-                  onStartExam={handleStartExam}
                 />
               )}
 
@@ -222,7 +222,6 @@ export default function App() {
               {activeView === 'exam_result' && activeResultAttemptId && (
                 <ExamResultView
                   attemptId={activeResultAttemptId}
-                  user={currentUser}
                   onNavigate={handleNavigate}
                   onTakePractice={() => handleNavigate('practice_hub')}
                 />
@@ -294,7 +293,6 @@ export default function App() {
               {activeView === 'exam_result' && activeResultAttemptId && (
                 <ExamResultView
                   attemptId={activeResultAttemptId}
-                  user={currentUser}
                   onNavigate={handleNavigate}
                   onTakePractice={() => handleNavigate('ai_exam_generator')}
                 />
