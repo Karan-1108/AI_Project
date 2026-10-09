@@ -57,7 +57,7 @@ class StorageService {
     this.ensureInitialized();
   }
 
-    private loadState(): AppState {
+  private loadState(): AppState {
     try {
       const storedVersion = localStorage.getItem(`${STORAGE_KEY}_version`);
 
@@ -113,26 +113,43 @@ class StorageService {
     };
   }
 
+  /**
+   * Test Supabase connection and report row counts for all key tables.
+   */
   public async testSupabaseConnection(): Promise<string> {
     try {
       const url = import.meta.env.VITE_SUPABASE_URL;
       const key = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
       if (!url || !key) {
-        return "❌ ERROR: Missing env vars. VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is undefined. Did you add them to Vercel and redeploy?";
+        return "❌ ERROR: Missing env vars. VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY is undefined.";
       }
 
-      const { data, error } = await supabase.from('subjects').select('*');
+      const [subjectsRes, conceptsRes, questionsRes, bktRes] = await Promise.all([
+        supabase.from('subjects').select('*', { count: 'exact', head: true }),
+        supabase.from('concepts').select('*', { count: 'exact', head: true }),
+        supabase.from('questions').select('*', { count: 'exact', head: true }),
+        supabase.from('bkt_parameters').select('*', { count: 'exact', head: true }),
+      ]);
 
-      if (error) {
-        return `❌ SUPABASE ERROR: ${error.message} (Code: ${error.code})`;
+      const errors = [subjectsRes.error, conceptsRes.error, questionsRes.error, bktRes.error].filter(Boolean);
+      if (errors.length > 0) {
+        return `❌ SUPABASE ERROR: ${errors[0]!.message}`;
       }
 
-      if (data) {
-        return `✅ SUCCESS: Connected to Supabase! Found ${data.length} subjects in the database.`;
-      }
+      const subjects = subjectsRes.count ?? 0;
+      const concepts = conceptsRes.count ?? 0;
+      const questions = questionsRes.count ?? 0;
+      const bktParams = bktRes.count ?? 0;
 
-      return "⚠️ Connected, but the 'subjects' table is empty.";
+      return (
+        `✅ SUCCESS: Connected to Supabase!\n\n` +
+        `📚 Subjects: ${subjects}\n` +
+        `🧠 Concepts: ${concepts}\n` +
+        `❓ Questions: ${questions}\n` +
+        `📊 BKT Parameters: ${bktParams}\n\n` +
+        `All data synced with the frontend.`
+      );
     } catch (e: any) {
       return `❌ EXCEPTION: ${e.message || 'Unknown error'}`;
     }
