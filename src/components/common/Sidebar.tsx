@@ -23,6 +23,7 @@ import {
   Wand2,
   FolderKanban,
   CheckCircle2,
+  ShieldCheck,
   LineChart,
   PieChart,
   Activity,
@@ -102,6 +103,12 @@ export const Sidebar: React.FC<SidebarProps> = ({
         { id: 'create_exam', label: 'Create Exam', icon: PlusCircle },
         { id: 'ai_exam_generator', label: 'AI Exam Generator', icon: Wand2, badge: 'A*' },
         { id: 'teacher_grading_assistant', label: 'Grading Assistant', icon: CheckCircle2 },
+      ],
+    },
+    {
+      group: 'Approvals',
+      items: [
+        { id: 'teacher_approval_workflow', label: 'Approval Queue', icon: ShieldCheck, badge: 'New' },
       ],
     },
     {

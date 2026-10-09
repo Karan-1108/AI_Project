@@ -36,6 +36,7 @@ import { GradingPatternInsightsView } from './components/teacher/GradingPatternI
 import { TeacherGradingAssistantView } from './components/teacher/TeacherGradingAssistantView';
 import { ReportsExportView } from './components/teacher/ReportsExportView';
 import { DatasetManagementView } from './components/teacher/DatasetManagementView';
+import { TeacherApprovalWorkflowView } from './components/teacher/TeacherApprovalWorkflowView';
 
 export default function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(() => AuthService.getCurrentUser());
@@ -289,7 +290,9 @@ export default function App() {
               {activeView === 'dataset_management' && (
                 <DatasetManagementView user={currentUser} />
               )}
-
+              {activeView === 'teacher_approval_workflow' && (
+                <TeacherApprovalWorkflowView user={currentUser} />
+              )}
               {activeView === 'exam_result' && activeResultAttemptId && (
                 <ExamResultView
                   attemptId={activeResultAttemptId}
